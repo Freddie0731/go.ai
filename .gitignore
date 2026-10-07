@@ -44,10 +44,17 @@ env/
 *.h5
 *.pkl
 
-# --- 构建/自检日志 ---
+# --- 构建/自检/基准日志（皆为本机产物） ---
 一键结果.txt
 build_log.txt
+build_log.raw.txt
+bench_log.txt
+selftest.log
 *.log
+
+# --- 已废弃的本机脚本（曾误入仓库，现已从跟踪中移除） ---
+完成推送.bat
+完成推送.ps1
 
 # --- 本机发布辅助脚本（含本机用户名与路径，不公开发布） ---
 push.bat

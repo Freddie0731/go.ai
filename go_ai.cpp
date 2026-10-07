@@ -767,8 +767,10 @@ struct NeuralNet {
         load_error.clear();
         std::ifstream f(path.c_str(), std::ios::binary);
         if (!f) {
-            load_error = "cannot open '" + path + "'";
-            if (errno != 0) load_error += std::string(": ") + std::strerror(errno);
+            // Report the raw errno value instead of strerror(): strerror is
+            // flagged C4996 on MSVC, and this code is built with /W3 where a
+            // warning is noise that hides real ones.
+            load_error = "cannot open '" + path + "' (errno " + std::to_string(errno) + ")";
             return false;
         }
         int nt;
