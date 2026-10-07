@@ -1,0 +1,72 @@
+name: build
+
+# Compiles go_ai.cpp with MSVC and runs the engine's self test.
+#
+# The self test does not need nn_weights.bin: it checks search invariants and
+# the legal-move enumeration with heuristic priors and skips the network
+# contract checks when no network is loaded. So CI validates the part that can
+# be validated without the trained weights, which are 100+ MB and are not in
+# this repository.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-selftest:
+    name: MSVC build + selftest
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Compile
+        shell: cmd
+        run: |
+          cl /nologo /O2 /EHsc /std:c++17 /W3 /DNDEBUG /Fe:GoAI3.exe go_ai.cpp /link gdiplus.lib gdi32.lib user32.lib
+          if errorlevel 1 exit /b 1
+
+      - name: Verify the binary was produced
+        shell: cmd
+        run: |
+          if not exist GoAI3.exe (
+            echo [FAILED] cl reported success but GoAI3.exe was not created.
+            exit /b 1
+          )
+
+      - name: Self test
+        shell: pwsh
+        run: |
+          # The console output is GBK-encoded on Windows, so read it back with
+          # the OEM code page instead of letting PowerShell guess.
+          $OutputEncoding = [Console]::OutputEncoding
+          $out = & .\GoAI3.exe --selftest 2>&1
+          $code = $LASTEXITCODE
+          $out | ForEach-Object { Write-Host $_ }
+          $out | Out-File -FilePath selftest.log -Encoding utf8
+          if ($code -ne 0) {
+            Write-Host "::error::self test failed with exit code $code"
+            exit 1
+          }
+          $text = ($out | Out-String)
+          if ($text -notmatch 'SELF TEST PASSED') {
+            Write-Host "::error::self test did not report SELF TEST PASSED"
+            exit 1
+          }
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest-log
+          path: selftest.log
+          if-no-files-found: ignore

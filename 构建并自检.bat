@@ -35,7 +35,7 @@ if defined VCVARS (
   >>"%LOG%" echo.
   call "!VCVARS!" >>"%LOG%" 2>&1
   echo [2/3] compiling ...
-  cl /nologo /O2 /EHsc /std:c++17 /W3 /DNDEBUG /Fe:GoAI3.exe go_ai.cpp /link gdiplus.lib >>"%LOG%" 2>&1
+  cl /nologo /O2 /EHsc /std:c++17 /W3 /DNDEBUG /Fe:GoAI3.exe go_ai.cpp /link gdiplus.lib gdi32.lib user32.lib >>"%LOG%" 2>&1
   set "BLD=!ERRORLEVEL!"
 ) else (
   where g++ >nul 2>nul
@@ -49,15 +49,34 @@ if defined VCVARS (
   >>"%LOG%" echo [compiler] MinGW g++
   >>"%LOG%" echo.
   echo [2/3] compiling ...
-  g++ -O2 -std=c++17 -pthread go_ai.cpp -o GoAI3.exe -lgdiplus -static >>"%LOG%" 2>&1
+  g++ -O2 -std=c++17 -pthread go_ai.cpp -o GoAI3.exe -lgdiplus -lgdi32 -luser32 -static >>"%LOG%" 2>&1
   set "BLD=!ERRORLEVEL!"
 )
+
+rem ---------------------------------------------------------------------------
+rem 不要信任 %ERRORLEVEL%：它可能被上面的 call 覆盖成 0，导致编译失败却报成功。
+rem 因此这里做两道判断：先看退出码，再看产物文件是否真的生成。
+rem ---------------------------------------------------------------------------
+set "PRODUCED=1"
+if not exist "GoAI3.exe" set "PRODUCED=0"
 
 if not "!BLD!"=="0" (
   echo.
   echo [FAILED] compile returned !BLD!
   >>"%LOG%" echo.
   >>"%LOG%" echo [FAILED] compile exit code !BLD!
+  goto :end
+)
+
+if "!PRODUCED!"=="0" (
+  echo.
+  echo [FAILED] compile reported success but GoAI3.exe was not created.
+  echo          Common cause: the old GoAI3.exe is still running and locked, so
+  echo          the linker cannot overwrite it. Close it or run:
+  echo              taskkill /IM GoAI3.exe /F
+  >>"%LOG%" echo.
+  >>"%LOG%" echo [FAILED] GoAI3.exe missing after cl reported success.
+  >>"%LOG%" echo Likely a locked/running GoAI3.exe. Try: taskkill /IM GoAI3.exe /F
   goto :end
 )
 

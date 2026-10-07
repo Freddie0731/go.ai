@@ -49,6 +49,13 @@ env/
 build_log.txt
 *.log
 
+# --- 本机发布辅助脚本（含本机用户名与路径，不公开发布） ---
+push.bat
+push.ps1
+*.superseded
+
+# --- 本机 SSH 私钥副本（绝不入库） ---
+goai-ssh/
 # --- 会话临时产物（本机调试残留，非项目内容） ---
 .dsh-write-probe.txt
 .dsh-plugin-probe/

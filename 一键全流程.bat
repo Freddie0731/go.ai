@@ -59,7 +59,7 @@ echo [2/4] 编译 go_ai.cpp -^> %OUTDIR%\GoAI3.exe ...
 >>"%LOG%" echo.
 >>"%LOG%" echo ===== 编译 =====
 pushd "%OUTDIR%"
-cl /nologo /O2 /EHsc /std:c++17 /W3 /DNDEBUG /Fe:GoAI3.exe "%SRCDIR%go_ai.cpp" /link gdiplus.lib >>"%LOG%" 2>&1
+cl /nologo /O2 /EHsc /std:c++17 /W3 /DNDEBUG /Fe:GoAI3.exe "%SRCDIR%go_ai.cpp" /link gdiplus.lib gdi32.lib user32.lib >>"%LOG%" 2>&1
 set "BLD=!ERRORLEVEL!"
 popd
 echo      编译返回码：!BLD!

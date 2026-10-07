@@ -1,6 +1,7 @@
 // go_ai.cpp - C++ Go AI with NN + Selfplay + Random Color
-// MSVC: cl /O2 /EHsc /std:c++17 /Fe:go_ai.exe go_ai.cpp
-// GCC:  g++ -O3 -march=native -std=c++17 -pthread go_ai.cpp -o go_ai.exe -mwindows -static -lgdiplus
+// MSVC: cl /O2 /EHsc /std:c++17 /Fe:go_ai.exe go_ai.cpp /link gdiplus.lib gdi32.lib user32.lib
+// GCC:  g++ -O3 -march=native -std=c++17 -pthread go_ai.cpp -o go_ai.exe -mwindows -static -lgdiplus -lgdi32 -luser32
+// (gdiplus for Gdiplus::*, gdi32 for the native GDI drawing calls in the GUI)
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -8,6 +9,20 @@
 #include <objidl.h>
 #include <gdiplus.h>
 #pragma comment(lib, "gdiplus.lib")
+// The GUI calls the Win32 API directly, and Visual Studio links the standard
+// Windows import libraries implicitly through its default library set. A bare
+// "cl" command line does not, so every Win32 import must be named explicitly or
+// it surfaces as LNK2019 "unresolved external symbol" (one round per missing
+// library, which is why they are all listed here up front):
+//   gdiplus -> Gdiplus::*            gdi32   -> CreateFontA, LineTo, Ellipse, BitBlt, ...
+//   user32  -> CreateWindowEx, BeginPaint, MessageBoxA, GetSystemMetrics, ...
+//   kernel32 -> GetModuleHandle, QueryPerformanceCounter, CreateThread, ...
+//   shell32 -> ShellExecute*, SHGetFolderPath, ...   comctl32 -> InitCommonControlsEx, ...
+#pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "user32.lib")
+#pragma comment(lib, "kernel32.lib")
+#pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "comctl32.lib")
 #undef near
 #undef far
 #undef min
@@ -726,6 +741,11 @@ struct NeuralNet {
     // because the file carried no marker. Either way the network is usable and
     // correct; this only drives the console report.
     bool layout_converted_at_load = false;
+    // Why the last load() failed, in plain words. load() used to return a bare
+    // bool, so every failure -- missing file, wrong board layout, missing
+    // tensor, size mismatch -- produced the same "No nn_weights.bin" message and
+    // sent the reader hunting for a file that was usually right there.
+    std::string load_error;
 
     static bool read_tensor(std::ifstream& f, std::string& name, NNTensor& t) {
         int nl;
@@ -744,18 +764,34 @@ struct NeuralNet {
     }
 
     bool load(const std::string& path) {
+        load_error.clear();
         std::ifstream f(path.c_str(), std::ios::binary);
-        if (!f) return false;
+        if (!f) {
+            load_error = "cannot open '" + path + "'";
+            if (errno != 0) load_error += std::string(": ") + std::strerror(errno);
+            return false;
+        }
         int nt;
-        if (!f.read((char*)&nt, 4) || nt <= 0) return false;
+        if (!f.read((char*)&nt, 4) || nt <= 0) {
+            load_error = "'" + path + "' is too short to hold a tensor count";
+            return false;
+        }
         std::unordered_map<std::string, NNTensor> W;
         for (int i = 0; i < nt; ++i) {
             std::string name;
             NNTensor t;
-            if (!read_tensor(f, name, t)) return false;
+            if (!read_tensor(f, name, t)) {
+                load_error = "'" + path + "' is malformed: tensor " + std::to_string(i + 1)
+                    + " of " + std::to_string(nt) + " could not be read "
+                    "(truncated file, or not the format written by the trainer)";
+                return false;
+            }
             W[name] = t;
         }
-        if (W.find("conv_in.weight") == W.end()) return false;
+        if (W.find("conv_in.weight") == W.end()) {
+            load_error = "'" + path + "' has no conv_in.weight";
+            return false;
+        }
         if (W["conv_in.weight"].shape.size() != 4) return false;
         ch = W["conv_in.weight"].shape[0];
         in_ch = W["conv_in.weight"].shape[1];
@@ -794,11 +830,35 @@ struct NeuralNet {
                 "v_fc1.weight", "v_fc1.bias", "v_fc2.weight", "v_fc2.bias"
             };
             for (size_t i = 0; i < sizeof(required) / sizeof(required[0]); ++i)
-                if (W.find(required[i]) == W.end()) return false;
-            if (W["p_fc.weight"].shape.size() != 2) return false;
-            if (W["p_fc.weight"].shape[1] != 2 * NN) return false;
-            if (W["p_fc.weight"].shape[0] != NN + 1) return false;
-            if (W["p_fc.bias"].data.size() != (size_t)(NN + 1)) return false;
+                if (W.find(required[i]) == W.end()) {
+                    load_error = std::string("'") + path + "' is missing required tensor '"
+                        + required[i] + "'";
+                    return false;
+                }
+            if (W["p_fc.weight"].shape.size() != 2) {
+                load_error = "'" + path + "' p_fc.weight is not 2-D";
+                return false;
+            }
+            if (W["p_fc.weight"].shape[1] != 2 * NN) {
+                load_error = "'" + path + "' p_fc.weight has " +
+                    std::to_string(W["p_fc.weight"].shape[1]) + " input columns, expected " +
+                    std::to_string(2 * NN) + " (2*361). A file written before the trainer "
+                    "switched to the 17-plane input will not fit.";
+                return false;
+            }
+            if (W["p_fc.weight"].shape[0] != NN + 1) {
+                load_error = "'" + path + "' p_fc.weight has " +
+                    std::to_string(W["p_fc.weight"].shape[0]) + " policy outputs, expected " +
+                    std::to_string(NN + 1) + " (361 board points + pass). Convert a 361-row "
+                    "file with the weight converter first.";
+                return false;
+            }
+            if (W["p_fc.bias"].data.size() != (size_t)(NN + 1)) {
+                load_error = "'" + path + "' p_fc.bias has " +
+                    std::to_string(W["p_fc.bias"].data.size()) + " entries, expected " +
+                    std::to_string(NN + 1);
+                return false;
+            }
         }
 
         conv_in_W = W["conv_in.weight"];
@@ -3253,10 +3313,24 @@ void run_gui_win32(double komi, const SearchParams& sp,
 // identical everywhere, and so a mismatch can never pass unnoticed.
 static bool load_network_or_report() {
     if (!g_nn.load("nn_weights.bin")) {
-        std::cerr << "No nn_weights.bin: the search will use heuristic priors "
-            "and a constant leaf value. A trained network is what makes this "
-            "engine play like KataGo rather than like plain heuristic MCTS."
-            << std::endl;
+        const std::string why = g_nn.load_error.empty()
+            ? std::string("unknown reason") : g_nn.load_error;
+        std::ifstream probe("nn_weights.bin", std::ios::binary | std::ios::ate);
+        if (!probe) {
+            std::cerr << "Not loading a neural network: nn_weights.bin was not found in the "
+                "current directory (" << why << ").\n"
+                "  The engine looks for it relative to the WORKING DIRECTORY, not the "
+                "executable. Run from the directory that holds the file, or copy "
+                "nn_weights.bin next to the exe.\n"
+                "  The search will use heuristic priors and a constant leaf value; a trained "
+                "network is what makes this engine play like KataGo rather than plain "
+                "heuristic MCTS." << std::endl;
+        } else {
+            std::cerr << "nn_weights.bin exists but could not be used, so no network is "
+                "loaded. Reported reason:\n"
+                "  " << why << "\n"
+                "  The search will use heuristic priors and a constant leaf value." << std::endl;
+        }
         return false;
     }
     std::cerr << "Neural net loaded: ch=" << g_nn.ch

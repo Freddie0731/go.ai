@@ -1,0 +1,23 @@
+GoAI3 build and self test
+date: 周三 2026/10/07 19:33:36.81
+source: D:\GoAI3\GoAI3\GoAI3\go_ai.cpp
+output: D:\GoAI3\GoAI3\x64\Debug\GoAI3_new.exe
+[compiler] MSVC
+vcvars: C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat
+go_ai.cpp
+D:\GoAI3\GoAI3\GoAI3\go_ai.cpp(771): warning C4996: 'strerror': This function or variable may be unsafe. Consider using strerror_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+
+===== self test =====
+GoAI++ build 2025-06-14-katago-mcts-3
+Neural net loaded: ch=32 blocks=4 in_ch=17 layout=converted-in-memory
+GoAI self test
+  [ok] symmetry transforms are permutations
+  [ok] transform_board matches transform_move
+  [ok] legal move enumeration is exact (205 moves)
+  [ok] network I/O contract: policy=362 (want 362) in_ch=17 (want 17) layout=converted-in-memory
+  [ok] priors normalise (n=360 sum=1.000000 min=5.61e-05 max=0.3105)
+  [ok] empty-board search: move=D4 visits=325 wr=24.6% depth=0 1.03s policy_sum=1.0000 nn=yes
+        top: D4/1 R16/1 Q16/1 C4/1 D16/1
+
+SELF TEST PASSED
+self test exit code: 0
