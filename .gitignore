@@ -1,0 +1,69 @@
+# ============================================================
+# GoAI3 —— 只保留围棋 AI 相关源码
+# ============================================================
+
+# --- 编译产物 (MSVC / MinGW) ---
+x64/
+Debug/
+Release/
+*.obj
+*.pdb
+*.ilk
+*.idb
+*.exe
+*.dll
+*.lib
+*.exp
+*.tlog
+*.lastbuildstate
+*.recipe
+*.FileListAbsolute.txt
+*.Build.CppClean.log
+
+# --- Visual Studio / IDE ---
+.vs/
+.vscode/
+.idea/
+*.vcxproj.user
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# --- 神经网络权重（体积大，不进版本库） ---
+*.bin
+*.pt
+*.pth
+*.onnx
+*.ckpt
+*.weights
+*.h5
+*.pkl
+
+# --- 构建/自检日志 ---
+一键结果.txt
+build_log.txt
+*.log
+
+# --- 会话临时产物（本机调试残留，非项目内容） ---
+.dsh-write-probe.txt
+.dsh-plugin-probe/
+
+# --- 与本仓库无关的本机目录 ---
+# dsh-black-gold-pet 是一个独立的 DSH 插件项目，不属于围棋 AI。
+# 若将来想单独发布它，把它移到自己的仓库即可；这里只是不让它污染 go.ai。
+dsh-black-gold-pet/
+# 证件照修图工具，同样与围棋无关。
+retouch_idphoto.py
+一键出图.bat
+forensics_parse.js
+_forensics_parse.js
+
+# --- 操作系统杂项 ---
+Thumbs.db
+Desktop.ini
+.DS_Store

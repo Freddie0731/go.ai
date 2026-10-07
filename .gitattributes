@@ -1,0 +1,32 @@
+# 统一换行符，避免 Windows/Linux 之间 clone 时产生整文件 diff
+* text=auto
+
+# 源码
+*.cpp   text
+*.h     text
+*.hpp   text
+*.py    text
+*.md    text
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.vcxproj         text eol=crlf
+*.vcxproj.filters text eol=crlf
+*.slnx  text eol=crlf
+
+# 二进制（永不转换）
+*.bin   binary
+*.exe   binary
+*.dll   binary
+*.lib   binary
+*.obj   binary
+*.pdb   binary
+*.ilk   binary
+*.idb   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+
+# 让 GitHub 语言统计识别
+*.cpp  linguist-language=C++
